@@ -1,0 +1,5 @@
+app_main.c:18:16:lsmd6s3_write	24	static
+app_main.c:34:16:lsm6ds3_read	24	static
+app_main.c:50:16:lis3mdl_write	24	static
+app_main.c:67:16:lis3mdl_read	24	static
+app_main.c:84:5:app_main	216	static

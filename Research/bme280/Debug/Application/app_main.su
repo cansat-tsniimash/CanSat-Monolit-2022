@@ -1,0 +1,8 @@
+app_main.c:9:13:bme_spi_cs_down	8	static
+app_main.c:15:13:bme_spi_cs_up	8	static
+app_main.c:22:29:bme_spi_read	24	static
+app_main.c:38:29:bme_spi_write	24	static
+app_main.c:54:13:bme_delay_us	16	static
+app_main.c:68:16:lsm_i2c_read	40	static
+app_main.c:76:16:lsm_i2c_write	40	static
+app_main.c:85:5:app_main	272	static
