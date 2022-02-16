@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--UGC_VERSION = 1024-->
+<XML_DOCUMENT xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/">
+    <PTC_HEADER>
+        <VENDOR>Parametric Technology Corporation</VENDOR>
+        <PRODUCT>Creo Parametric 3402018070</PRODUCT>
+        <XML_VERSION>1.0</XML_VERSION>
+        <HOST_NAME>RAKETOV-NB</HOST_NAME>
+        <USER>MI</USER>
+        <MACHINE_TYPE> Intel64 Family 6 Model 142 Stepping 10  GenuineIntel  1992 MHz</MACHINE_TYPE>
+    </PTC_HEADER>
+    <zip_manifest_info pointer="TRUE" proe_version="1844" top_model_wname="SBORKA3_ASM_ASM.ASM"/>
+</XML_DOCUMENT>
