@@ -1,0 +1,4 @@
+minmea.h:169:29:minmea_rescale	16	static
+minmea.h:185:21:minmea_tofloat	16	static
+minmea.h:196:21:minmea_tocoord	24	static
+example.c:15:5:main	200	static

@@ -1,0 +1,10 @@
+minmea.h:196:21:minmea_tocoord	24	static
+nmea_gps.c:39:13:cb_push	24	static
+nmea_gps.c:54:13:cb_pop	16	static
+nmea_gps.c:70:12:gps_parse	16	static
+nmea_gps.c:102:5:gps_init	8	static
+nmea_gps.c:115:5:gps_push_byte	16	static
+nmea_gps.c:122:5:gps_work	88	static
+nmea_gps.c:158:5:gps_get_coords	24	static
+nmea_gps.c:168:5:gps_get_alt	16	static
+nmea_gps.c:176:5:gps_get_time	24	static
