@@ -4,87 +4,10 @@
 
 #include "minmea/minmea.h"
 
+#include "nmea_gps.h"
 
-static const char data[] =
-		"$GPRMC,155935.00,V,,,,,,,090222,,,N*78\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155935.00,,,,,0,00,99.99,,,,,,*68\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,02,02,,,27,11,,,30*7F\r\n"
-		"$GPGLL,,,,,155935.00,V,N*44\r\n"
-		"$GPRMC,155936.00,V,,,,,,,090222,,,N*7B\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155936.00,,,,,0,00,99.99,,,,,,*6B\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,03,02,,,26,11,,,30,20,,,28*77\r\n"
-		"$GPGLL,,,,,155936.00,V,N*47\r\n"
-		"$GPRMC,155937.00,V,,,,,,,090222,,,N*7A\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155937.00,,,,,0,00,99.99,,,,,,*6A\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,02,02,,,27,11,,,29*77\r\n"
-		"$GPGLL,,,,,155937.00,V,N*46\r\n"
-		"$GPRMC,155938.00,V,,,,,,,090222,,,N*75\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155938.00,,,,,0,00,99.99,,,,,,*65\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,03,02,,,27,11,,,29,21,,,20*77\r\n"
-		"$GPGLL,,,,,155938.00,V,N*49\r\n"
-		"$GPRMC,155939.00,V,,,,,,,090222,,,N*74\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155939.00,,,,,0,00,99.99,,,,,,*64\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,03,02,,,26,11,,,29,22,,,20*75\r\n"
-		"$GPGLL,,,,,155939.00,V,N*48\r\n"
-		"$GPRMC,155940.00,V,,,,,,,090222,,,N*7A\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155940.00,,,,,0,00,99.99,,,,,,*6A\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,02,02,,,27,11,,,30*7F\r\n"
-		"$GPGLL,,,,,155940.00,V,N*46\r\n"
-		"$GPRMC,155941.00,V,,,,,,,090222,,,N*7B\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155941.00,,,,,0,00,99.99,,,,,,*6B\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,02,02,,,27,11,,,30*7F\r\n"
-		"$GPGLL,,,,,155941.00,V,N*47\r\n"
-		"$GPRMC,155942.00,V,,,,,,,090222,,,N*78\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155942.00,,,,,0,00,99.99,,,,,,*68\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,03,02,,,26,11,,,29,23,,,24*70\r\n"
-		"$GPGLL,,,,,155942.00,V,N*44\r\n"
-		"$GPRMC,155943.00,V,,,,,,,090222,,,N*79\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155943.00,,,,,0,00,99.99,,,,,,*69\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,03,02,,,26,11,,,29,24,,,21*72\r\n"
-		"$GPGLL,,,,,155943.00,V,N*45\r\n"
-		"$GPRMC,155944.00,V,,,,,,,090222,,,N*7E\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155944.00,,,,,0,00,99.99,,,,,,*6E\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,02,02,,,26,11,,,29*76\r\n"
-		"$GPGLL,,,,,155944.00,V,N*42\r\n"
-		"$GPRMC,155945.00,V,,,,,,,090222,,,N*7F\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155945.00,,,,,0,00,99.99,,,,,,*6F\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,03,02,,,27,11,,,30,25,,,28*73\r\n"
-		"$GPGLL,,,,,155945.00,V,N*43\r\n"
-		"$GPRMC,155946.00,V,,,,,,,090222,,,N*7C\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155946.00,,,,,0,00,99.99,,,,,,*6C\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,02,02,,,28,11,,,30*70\r\n"
-		"$GPGLL,,,,,155946.00,V,N*40\r\n"
-		"$GPRMC,155947.00,V,,,,,,,090222,,,N*7D\r\n"
-		"$GPVTG,,,,,,,,,N*30\r\n"
-		"$GPGGA,155947.00,,,,,0,00,99.99,,,,,,*6D\r\n"
-		"$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30\r\n"
-		"$GPGSV,1,1,02,02,,,28,11,,,30*70\r\n"
-		"$GPGLL,,,,,155947.00,V,N*41"
-;
+
+
 
 static const char super_data[] =
 		"$GPRMC,170904.935,V,3854.928,N,07702.497,W,78.4,1.83,021116,,E*42\r\n"
@@ -689,9 +612,6 @@ static const char super_data[] =
 		"$GPGSV,2,2,06,17,88,153,85,11,82,191,33*70\r\n"
 ;
 
-static uint8_t uart_buffer[1000] = { 0 };
-static size_t uart_buffer_head = 0;
-static size_t uart_buffer_tail = 0;
 
 
 int app_main()
@@ -699,18 +619,34 @@ int app_main()
 	extern UART_HandleTypeDef huart2;
 	__HAL_UART_ENABLE_IT(&huart2, UART_IT_RXNE);
 
+	gps_init();
+	int i =0;
 	while(1)
 	{
-		HAL_Delay(300);
-		printf("i slept\n");
-
-		uint8_t byte;
-
+		gps_push_byte(super_data[i]);
+		i++;
+		gps_work();
+		int64_t cookie;
+		float lat_;
+		float lon_;
+		float alt_;
+		uint64_t time_s;
+		uint32_t time_us;
+		gps_get_coords(&cookie, &lat_, &lon_, &alt_);
+		gps_get_alt(&cookie, &alt_);
+		gps_get_time(&cookie,&time_s,&time_us);
+		printf("cookie = %d\n\r", (int) cookie);
+		printf("time_s = %d\n\r ", (int) time_s);
+		printf("time_us = %d\n\r ", (int) time_us);
+		printf("lat_ =%f\n\r ", (float) lat_);
+		printf("lon_ = %f\n\r ", (float) lon_);
+		printf("alt_= %f\n\r ", (float) alt_);
+	}
 }
 
 int app_main_backup()
 {
-	int data_size = sizeof(puper_data)/sizeof(puper_data[0]);
+	int data_size = sizeof(super_data)/sizeof(super_data[0]);
 
 	printf("begun\n");
 	printf("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n");
@@ -720,7 +656,7 @@ int app_main_backup()
 
 	for (int i = 0; i < data_size; i++)
 	{
-		gps_parse(puper_data[i]);
+		gps_parse(super_data[i]);
 		if (pavel_gps_sost == 2)
 		{
 			// Мы накопили сообщение. Можно его разбирать
@@ -729,7 +665,7 @@ int app_main_backup()
 			id = minmea_sentence_id(pavel_gps_buffer);
 			if (id != MINMEA_SENTENCE_GGA)
 			{
-				printf("not gga %d\n", id);
+				printf("not gga %d\n\r", id);
 				continue;
 			}
 
@@ -741,8 +677,8 @@ int app_main_backup()
 				continue;
 			}
 
-			printf("lat = %f ", minmea_tocoord(&gga.latitude));
-			printf("lon = %f", minmea_tocoord(&gga.longitude));
+			printf("lat = %f\n\r ", minmea_tocoord(&gga.latitude));
+			printf("lon = %f\n\r", minmea_tocoord(&gga.longitude));
 			printf("\n");
 		}
 	}

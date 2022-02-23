@@ -25,7 +25,7 @@ Application/app_main.o: ../Application/app_main.c ../Application/gps.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
- ../Application/minmea/minmea.h
+ ../Application/minmea/minmea.h ../Application/nmea_gps.h
 
 ../Application/gps.h:
 
@@ -82,3 +82,5 @@ Application/app_main.o: ../Application/app_main.c ../Application/gps.h \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:
 
 ../Application/minmea/minmea.h:
+
+../Application/nmea_gps.h:

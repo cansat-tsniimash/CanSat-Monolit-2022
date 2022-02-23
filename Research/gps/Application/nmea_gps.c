@@ -118,12 +118,48 @@ int gps_push_byte(uint8_t byte)
 	return 0;
 }
 
+int on_gps_byte(uint32_t byte)
+{
+	if (pavel_gps_sost == 0)
+		{
+			if (byte == '$')
+			{
+				pavel_gps_buffer[0]='$';
+				pavel_gps_sost = 1;
+				pavel_gps_carret = 1;
+			}
+		}
+		else
+		{
+			if (pavel_gps_carret >= sizeof(pavel_gps_buffer) / sizeof(pavel_gps_buffer[0]))
+			{
+				pavel_gps_sost = 0;
+				return pavel_gps_sost;
+			}
+
+			pavel_gps_buffer[pavel_gps_carret] = byte;
+			pavel_gps_carret = pavel_gps_carret + 1;
+			if (byte == '\n' )
+			{
+				pavel_gps_sost = 2;
+				pavel_gps_buffer[pavel_gps_carret] =0;
+			}
+		}
+
+		return pavel_gps_sost;
+}
+
 
 int gps_work()
 {
 	uint8_t byte;
 	for (schetchik = 0; schetchik < GPS_SYMBOLS_PER_ACTS; schetchik++)
 	{
+		if (cb_pop(&byte) == false)
+		{
+			printf("not bytes in buffer\n\r");
+			break;
+		}
 		gps_parse(byte);
 		if (pavel_gps_sost == 2)
 		{
@@ -133,7 +169,7 @@ int gps_work()
 			id = minmea_sentence_id(pavel_gps_buffer);
 			if (id != MINMEA_SENTENCE_GGA)
 			{
-				printf("not gga %d\n", id);
+				printf("not gga %d\n\r", id);
 				continue;
 			}
 
@@ -141,13 +177,21 @@ int gps_work()
 			bool succes = minmea_parse_gga(&gga, pavel_gps_buffer);
 			if (!succes)
 			{
-				printf("not success\n");
+				printf("not success\n\r");
 				continue;
 			}
+			time_us = gga.time.microseconds;
+			time_s = 3600*gga.time.hours + 60*gga.time.minutes + gga.time.seconds;
+			lat = minmea_tocoord(&gga.latitude);
+			lon = minmea_tocoord(&gga.longitude);
+			alt = minmea_tofloat(&gga.altitude);
+			pos_cookie++;
+			alt_cookie++;
+			time_cookie++;
 
-			printf("lat = %f ", minmea_tocoord(&gga.latitude));
-			printf("lon = %f", minmea_tocoord(&gga.longitude));
-			printf("\n");
+			printf("lat = %f\n\r ", minmea_tocoord(&gga.latitude));
+			printf("lon = %f\n\r", minmea_tocoord(&gga.longitude));
+			printf("\n\r");
 		}
 	}
 	return 0;
