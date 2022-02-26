@@ -3574,8 +3574,8 @@ distributor Buerklin, 11G810</description>
 <pad name="1" x="-4.7" y="0" drill="1.6" diameter="3" shape="octagon" rot="R90"/>
 <pad name="2" x="0" y="0" drill="1.6" diameter="3" shape="octagon" rot="R90"/>
 <pad name="3" x="4.7" y="0" drill="1.6" diameter="3" shape="octagon" rot="R90"/>
-<text x="-6.351" y="-5.08" size="1.27" layer="21" ratio="10">ON</text>
-<text x="3.176" y="-5.08" size="1.27" layer="21" ratio="10">OFF</text>
+<text x="-6.985" y="-1.017" size="1.27" layer="21" ratio="10" rot="R90">ON</text>
+<text x="8.128" y="-1.269" size="1.27" layer="21" ratio="10" rot="R90">OFF</text>
 <text x="-6.478" y="3.556" size="1.27" layer="25" ratio="10">&gt;NAME</text>
 <text x="0" y="3.556" size="1.27" layer="27" ratio="10">&gt;VALUE</text>
 </package>
