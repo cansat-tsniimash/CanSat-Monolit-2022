@@ -2,9 +2,7 @@
 
 #include <stm32f4xx_hal.h>
 
-#include "minmea/minmea.h"
-
-#include "nmea_gps.h"
+#include "ATGM336H/nmea_gps.h"
 
 
 
@@ -643,7 +641,7 @@ int app_main()
 		printf("alt_= %f\n\r ", (float) alt_);
 	}
 }
-
+/*
 int app_main_backup()
 {
 	int data_size = sizeof(super_data)/sizeof(super_data[0]);
@@ -685,3 +683,4 @@ int app_main_backup()
 
 	return 0;
 }
+*/
