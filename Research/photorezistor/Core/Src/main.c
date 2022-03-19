@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include <math.h>
 #include <stdio.h>
+#include "Photorezistor/photorezistor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -103,17 +104,12 @@ int main(void)
 	  char light[100] = {0};
 	  char resist[100] = {0};
 
+	  photorezistor_t ph;
+	  ph.hadc= &hadc1;
+	  ph.resist=5300;
+	  float lux = photorezistor_get_lux(ph);
 
-	  HAL_ADC_Start(&hadc1);
-	  HAL_ADC_PollForConversion(&hadc1, 100);
-	  float volts = HAL_ADC_GetValue(&hadc1) * 3.3 / 4095;	//Volts
-	  float ohms = volts*5100/(3.3-volts);		//Ohms
-	  float lux = exp((3.823-log(ohms/1000))/0.816)*10.764;	//Lux
-	  HAL_ADC_Stop(&hadc1);
-
-	  snprintf(resist, 100, "Resistanse %f     ", ohms);
 	  snprintf(light, 100, "Light %f\n\r", lux);
-	  HAL_UART_Transmit(&huart2, resist, sizeof(resist), 100);
 	  HAL_UART_Transmit(&huart2, light, sizeof(light), 100);
     /* USER CODE END WHILE */
 
