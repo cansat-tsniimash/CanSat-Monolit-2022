@@ -2178,6 +2178,27 @@ design rules under a new name.</description>
 <wire x1="12.43" y1="69.93" x2="12" y2="69.5" width="0.6" layer="1"/>
 <wire x1="12" y1="69.5" x2="10.63" y2="68.13" width="0.6" layer="1"/>
 <via x="12" y="69.5" extent="1-16" drill="0.45"/>
+<polygon width="0.1524" layer="16" pour="cutout">
+<vertex x="0" y="78.5"/>
+<vertex x="3.5" y="78.5"/>
+<vertex x="3.5" y="75"/>
+<vertex x="0" y="75"/>
+</polygon>
+<polygon width="0.1524" layer="16" pour="cutout">
+<vertex x="-4.5" y="17"/>
+<vertex x="-0.5" y="17"/>
+<vertex x="-0.5" y="18.5"/>
+<vertex x="3.5" y="18.5"/>
+<vertex x="3.5" y="10"/>
+<vertex x="3.5" y="9.5"/>
+<vertex x="-4.5" y="9.5"/>
+</polygon>
+<polygon width="0.1524" layer="16" pour="cutout">
+<vertex x="17" y="-6"/>
+<vertex x="17" y="0"/>
+<vertex x="24" y="0"/>
+<vertex x="24" y="-6"/>
+</polygon>
 </signal>
 <signal name="N$2">
 <contactref element="VR1" pad="3"/>
@@ -2526,6 +2547,27 @@ design rules under a new name.</description>
 </polygon>
 <wire x1="14.025" y1="52.73" x2="14.27" y2="52.73" width="0.6" layer="1"/>
 <wire x1="14.27" y1="52.73" x2="15" y2="52" width="0.6" layer="1"/>
+<polygon width="0.1524" layer="1" pour="cutout">
+<vertex x="-4.5" y="17"/>
+<vertex x="-0.5" y="17"/>
+<vertex x="-0.5" y="18.5"/>
+<vertex x="3.5" y="18.5"/>
+<vertex x="3.5" y="10"/>
+<vertex x="3.5" y="9.5"/>
+<vertex x="-4.5" y="9.5"/>
+</polygon>
+<polygon width="0.1524" layer="1" pour="cutout">
+<vertex x="0" y="78.5"/>
+<vertex x="3.5" y="78.5"/>
+<vertex x="3.5" y="75"/>
+<vertex x="0" y="75"/>
+</polygon>
+<polygon width="0.1524" layer="1" pour="cutout">
+<vertex x="17" y="-6"/>
+<vertex x="17" y="0"/>
+<vertex x="24" y="0"/>
+<vertex x="24" y="-6"/>
+</polygon>
 </signal>
 </signals>
 <mfgpreviewcolors>
