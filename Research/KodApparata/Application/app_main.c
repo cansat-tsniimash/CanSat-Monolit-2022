@@ -254,7 +254,7 @@ int app_main(void)
 
 
 			nrf24_mode_standby(&nrf24_lower_api_config);
-			//nrf24_mode_tx(&nrf24_lower_api_config);
+			nrf24_mode_tx(&nrf24_lower_api_config);
 
 
 			dump_registers(&nrf24_lower_api_config);
@@ -274,6 +274,7 @@ int app_main(void)
 			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;temp;press;\n");
 			f_write(&SDFile, (uint8_t*) headbuffer, headcount, &CheckBytes);
 			f_sync(&SDFile);*/
+			uint16_t packet_num = 0;
 			while(1)
 			{
 				nrf24_fifo_status_t Status_FIFO_RX;
@@ -290,8 +291,7 @@ int app_main(void)
 				packet.LSM6DSL_gyroscope_x = gyro_dps[0];
 				packet.LSM6DSL_gyroscope_y = gyro_dps[1];
 				packet.LSM6DSL_gyroscope_z = gyro_dps[2];
-				packet.num = 0;
-				packet.num++;
+				packet.num = packet_num++;
 				packet.time = HAL_GetTick();
 				packet.crc = Crc16((uint8_t*) &packet, sizeof(packet));
 
@@ -308,10 +308,6 @@ int app_main(void)
 					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet , sizeof(packet), false);
 
 					nrf24_fifo_status(&nrf24_lower_api_config, &Status_FIFO_RX, &Status_FIFO_TX);
-
-					nrf24_mode_tx(&nrf24_lower_api_config);
-					HAL_Delay(100);
-					nrf24_mode_standby(&nrf24_lower_api_config);
 				}
 				else
 				{
