@@ -172,6 +172,17 @@ int app_main(void)
 
 
 // НАСТРОЙКА РАДИО (СТРАКТЫ)
+			shift_reg_t shift_reg_ = {
+					.bus = &hspi2,
+					.latch_port= GPIOC,
+					.latch_pin = GPIO_PIN_1,
+					.oe_port = GPIOC,
+					.oe_pin = GPIO_PIN_13,
+					.value = 0
+			};
+			shift_reg_init(&shift_reg_);
+			shift_reg_oe(&shift_reg_, true);
+			shift_reg_write_8(&shift_reg_, 0xFF);
 
 			//Сдвиговый регистр радио
 			shift_reg_t shift_reg_rf = {
@@ -183,6 +194,7 @@ int app_main(void)
 					.value = 0
 			};
 			shift_reg_init(&shift_reg_rf);
+			shift_reg_oe(&shift_reg_rf, true);
 			shift_reg_write_8(&shift_reg_rf, 0xFF);
 			// Структура, содержащая параметры SPI пинов  Chip Enab и SPI Chip Select для сдвигового регистра
 			nrf24_spi_pins_sr_t nrf24_spi_pins_sr = {
@@ -225,14 +237,7 @@ int app_main(void)
 			nrf24_pipe_set_tx_addr(&nrf24_lower_api_config, 0xacacacacac);
 
 // НАСТРОЙКА ЛСМ И БМЕ (СТРАКТЫ)
-			shift_reg_t shift_reg_ = {
-					.bus = &hspi2,
-					.latch_port= GPIOC,
-					.latch_pin = GPIO_PIN_1,
-					.oe_port = GPIOC,
-					.oe_pin = GPIO_PIN_13,
-					.value = 0
-			};
+
 			bme_spi_intf_sr spi_interface_bme = {
 					.sr_pin = 2,
 					.spi = &hspi2,
@@ -257,14 +262,13 @@ int app_main(void)
 			nrf24_mode_tx(&nrf24_lower_api_config);
 
 
-			dump_registers(&nrf24_lower_api_config);
+			//dump_registers(&nrf24_lower_api_config);
 
 
 
 			spi_interface_lsm.sr = &shift_reg_;
 			spi_interface_bme.sr = &shift_reg_;
-			shift_reg_init(&shift_reg_);
-			shift_reg_write_8(&shift_reg_, 0xFF);
+
 			bme_init_default_sr(&bme, &spi_interface_bme);
 			lsmset_sr (&ctx, &spi_interface_lsm);
 			float acc_g[3];
@@ -301,13 +305,11 @@ int app_main(void)
 				f_sync(&SDFile);
 				*/
 
-				dump_registers(&nrf24_lower_api_config);
+				//dump_registers(&nrf24_lower_api_config);
 				nrf24_fifo_status(&nrf24_lower_api_config, &Status_FIFO_RX, &Status_FIFO_TX);
-
 				if (Status_FIFO_TX != NRF24_FIFO_FULL) {
 					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet , sizeof(packet), false);
-
-					nrf24_fifo_status(&nrf24_lower_api_config, &Status_FIFO_RX, &Status_FIFO_TX);
+					HAL_Delay(1000);
 				}
 				else
 				{
@@ -315,10 +317,10 @@ int app_main(void)
 					nrf24_fifo_flush_tx(&nrf24_lower_api_config);
 				}
 
-				nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
+				//nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 				//HAL_UART_Transmit(&huart1, (uint8_t*) &packet, sizeof(packet), 100);
-				//printf("ax: %10lf ay: %10lf az: %10lf gx: %10lf gy: %10lf gz: %10lf\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2]);
-				//printf("%lf %lf\n", comp_data.pressure, comp_data.temperature);
+				printf("ax: %10lf ay: %10lf az: %10lf gx: %10lf gy: %10lf gz: %10lf\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2]);
+				printf("%lf %lf\n", comp_data.pressure, comp_data.temperature);
 			}
 
 	return 0;
