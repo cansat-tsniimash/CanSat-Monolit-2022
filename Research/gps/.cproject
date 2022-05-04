@@ -78,7 +78,7 @@
 						<entry excluding="minmea/example.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Application"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
-						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="stm32f4"/>
+						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="stm32f4"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
