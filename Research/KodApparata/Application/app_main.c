@@ -12,12 +12,13 @@
 #include "nRF24L01_PL/nrf24_upper_api.h"
 #include "nRF24L01_PL/nrf24_lower_api_stm32.h"
 #include "nRF24L01_PL/nrf24_lower_api.h"
+#include "Photorezistor/photorezistor.h"
 
 
 
-
+extern ADC_HandleTypeDef hadc1;
 extern SPI_HandleTypeDef hspi2;
-extern  UART_HandleTypeDef huart1;
+extern UART_HandleTypeDef huart1;
 
 //радио: настройка радио-части(+) и настройка протокольной части(+), настройка пайпа(+), перегон в режим отправки (тх) (+); потом радио пакты пихаем в ФИФО(проверка на свободное место в ФИФО),
 unsigned short Crc16(unsigned char *buf, unsigned short len)
@@ -158,14 +159,14 @@ typedef struct
 int app_main(void)
 {
 
-     /*       // Карта памяти (ПЕРЕМЕННЫЕ)
+            // Карта памяти (ПЕРЕМЕННЫЕ)
 			FATFS fileSystem; // переменная типа FATFS
 			FIL SDFile; // хендлер файла
 			UINT CheckBytes; // количество символов, реально записанных внутрь файла
 			FRESULT resSD; // результат выполнения функции
 			uint8_t path[11] = "SDcard.csv";
 			path[10] =  '\0';
-	*/
+
 			// Переменные для работы с бме и лсм
 			struct bme280_dev bme = {0};
 			stmdev_ctx_t ctx = {0};
@@ -236,7 +237,7 @@ int app_main(void)
 			nrf24_pipe_rx_start(&nrf24_lower_api_config, 1, &pipe_config);
 			nrf24_pipe_set_tx_addr(&nrf24_lower_api_config, 0xacacacacac);
 
-// НАСТРОЙКА ЛСМ И БМЕ (СТРАКТЫ)
+// НАСТРОЙКА ЛСМ И БМЕ, Фоторезистор (СТРАКТЫ)
 
 			bme_spi_intf_sr spi_interface_bme = {
 					.sr_pin = 2,
@@ -248,14 +249,17 @@ int app_main(void)
 					.spi = &hspi2,
 					.sr = &shift_reg_
 			};
+			photorezistor_t photorez_set = {
+				.resist = 5100,
+				.hadc = &hadc1
+			};
 
 	// ОСНОВНАЯ ЧАСТЬ, САМИ ФУНКЦИИ ИНИЦИАЛИЗАЦИИ ПРИБОРОВ
-			/*resSD = f_mount(&fileSystem, "", 1);
+			resSD = f_mount(&fileSystem, "", 1);
 			if(resSD != FR_OK) {
 				printf("mount error, %d\n", resSD);
 			}
 			f_open(&SDFile, (char*)path, FA_WRITE | FA_CREATE_ALWAYS);
-	*/
 
 
 			nrf24_mode_standby(&nrf24_lower_api_config);
@@ -272,16 +276,18 @@ int app_main(void)
 			float acc_g[3];
 			float gyro_dps[3];
 			float temperature_celsius_mag;
-			/*char headbuffer[1000];
-			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;temp;press;\n");
+			char headbuffer[1000];
+			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;temp;press;lux\n");
 			f_write(&SDFile, (uint8_t*) headbuffer, headcount, &CheckBytes);
-			f_sync(&SDFile);*/
+			f_sync(&SDFile);
 			uint16_t packet_num = 0;
 			while(1)
 			{
+				HAL_ADC_Start(&hadc1);
 				nrf24_fifo_status_t Status_FIFO_RX;
 				nrf24_fifo_status_t Status_FIFO_TX;
 				struct bme280_data comp_data = bme_read_data(&bme);
+				float lux = photorezistor_get_lux(photorez_set);
 				lsmread(&ctx, &temperature_celsius_mag, &acc_g, &gyro_dps);
 				packet_da_type_1_t packet = {0};
 				packet.flag = 228;
@@ -297,11 +303,11 @@ int app_main(void)
 				packet.time = HAL_GetTick();
 				packet.crc = Crc16((uint8_t*) &packet, sizeof(packet));
 
-				/*char snbuffer[1000];
-				int count = snprintf(snbuffer, 1000, "%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%lf;%lf;\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2], comp_data.pressure, comp_data.temperature);
+				char snbuffer[1000];
+				int count = snprintf(snbuffer, 1000, "%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%lf;%lf;%lf\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2], comp_data.pressure, comp_data.temperature, lux);
 				f_write(&SDFile, (uint8_t*) snbuffer, count, &CheckBytes);
 				f_sync(&SDFile);
-				*/
+
 
 				//dump_registers(&nrf24_lower_api_config);
 				nrf24_fifo_status(&nrf24_lower_api_config, &Status_FIFO_RX, &Status_FIFO_TX);
@@ -320,7 +326,7 @@ int app_main(void)
 
 				//nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 				//HAL_UART_Transmit(&huart1, (uint8_t*) &packet, sizeof(packet), 100);
-				printf("ax:%10lf     ay:%10lf     az:%10lf     press: %lf     temp: %lf\n", acc_g[0], acc_g[1], acc_g[2], comp_data.pressure, comp_data.temperature);
+				printf("lux: %lf\n", lux);
 			}
 
 	return 0;
