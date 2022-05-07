@@ -139,8 +139,8 @@ static void dump_registers(void *intf_ptr)
 typedef struct
 {
 	uint8_t flag;
-	uint8_t BME280_temperature;
 
+	int16_t BME280_temperature;
 	int16_t LSM6DSL_accelerometr_x;
 	int16_t LSM6DSL_accelerometr_y;
 	int16_t LSM6DSL_accelerometr_z;
@@ -259,9 +259,7 @@ int app_main(void)
 
 
 			nrf24_mode_standby(&nrf24_lower_api_config);
-			nrf24_mode_tx(&nrf24_lower_api_config);
-
-
+			//nrf24_mode_tx(&nrf24_lower_api_config);
 			//dump_registers(&nrf24_lower_api_config);
 
 
@@ -287,14 +285,14 @@ int app_main(void)
 				lsmread(&ctx, &temperature_celsius_mag, &acc_g, &gyro_dps);
 				packet_da_type_1_t packet = {0};
 				packet.flag = 228;
-				packet.BME280_temperature = comp_data.temperature;
+				packet.BME280_temperature = 10 * comp_data.temperature;
 				packet.BME280_pressure = comp_data.pressure;
-				packet.LSM6DSL_accelerometr_x = acc_g[0];
-				packet.LSM6DSL_accelerometr_y = acc_g[1];
-				packet.LSM6DSL_accelerometr_z = acc_g[2];
-				packet.LSM6DSL_gyroscope_x = gyro_dps[0];
-				packet.LSM6DSL_gyroscope_y = gyro_dps[1];
-				packet.LSM6DSL_gyroscope_z = gyro_dps[2];
+				packet.LSM6DSL_accelerometr_x = (int16_t)(1000 * acc_g[0]);
+				packet.LSM6DSL_accelerometr_y = (int16_t)(1000 * acc_g[1]);
+				packet.LSM6DSL_accelerometr_z = (int16_t)(1000 * acc_g[2]);
+				packet.LSM6DSL_gyroscope_x = (int16_t)(1000 * gyro_dps[0]);
+				packet.LSM6DSL_gyroscope_y = (int16_t)(1000 * gyro_dps[1]);
+				packet.LSM6DSL_gyroscope_z = (int16_t)(1000 * gyro_dps[2]);
 				packet.num = packet_num++;
 				packet.time = HAL_GetTick();
 				packet.crc = Crc16((uint8_t*) &packet, sizeof(packet));
@@ -309,7 +307,10 @@ int app_main(void)
 				nrf24_fifo_status(&nrf24_lower_api_config, &Status_FIFO_RX, &Status_FIFO_TX);
 				if (Status_FIFO_TX != NRF24_FIFO_FULL) {
 					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet , sizeof(packet), false);
-					HAL_Delay(1000);
+					nrf24_mode_tx(&nrf24_lower_api_config);
+					HAL_Delay(10);
+					nrf24_mode_standby(&nrf24_lower_api_config);
+
 				}
 				else
 				{
@@ -319,8 +320,7 @@ int app_main(void)
 
 				//nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 				//HAL_UART_Transmit(&huart1, (uint8_t*) &packet, sizeof(packet), 100);
-				printf("ax: %10lf ay: %10lf az: %10lf gx: %10lf gy: %10lf gz: %10lf\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2]);
-				printf("%lf %lf\n", comp_data.pressure, comp_data.temperature);
+				printf("ax:%10lf     ay:%10lf     az:%10lf     press: %lf     temp: %lf\n", acc_g[0], acc_g[1], acc_g[2], comp_data.pressure, comp_data.temperature);
 			}
 
 	return 0;
