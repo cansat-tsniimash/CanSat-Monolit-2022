@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 
+#include "gps.h"
 #include "fatfs.h"
 #include "LSM6DS3/DLSM.h"
 #include "BME280/DriverForBME280.h"
@@ -13,12 +14,14 @@
 #include "nRF24L01_PL/nrf24_lower_api_stm32.h"
 #include "nRF24L01_PL/nrf24_lower_api.h"
 #include "Photorezistor/photorezistor.h"
+#include "ATGM336H/nmea_gps.h"
 
 
 
 extern ADC_HandleTypeDef hadc1;
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
+extern UART_HandleTypeDef huart6;
 
 //радио: настройка радио-части(+) и настройка протокольной части(+), настройка пайпа(+), перегон в режим отправки (тх) (+); потом радио пакты пихаем в ФИФО(проверка на свободное место в ФИФО),
 unsigned short Crc16(unsigned char *buf, unsigned short len)
@@ -197,6 +200,8 @@ int app_main(void)
 			shift_reg_init(&shift_reg_rf);
 			shift_reg_oe(&shift_reg_rf, true);
 			shift_reg_write_8(&shift_reg_rf, 0xFF);
+			shift_reg_oe(&shift_reg_rf, false);
+
 			// Структура, содержащая параметры SPI пинов  Chip Enab и SPI Chip Select для сдвигового регистра
 			nrf24_spi_pins_sr_t nrf24_spi_pins_sr = {
 					.pos_CE = 0,
@@ -267,17 +272,25 @@ int app_main(void)
 			//dump_registers(&nrf24_lower_api_config);
 
 
-
 			spi_interface_lsm.sr = &shift_reg_;
 			spi_interface_bme.sr = &shift_reg_;
 
+			gps_init();
+			__HAL_UART_ENABLE_IT(&huart6, UART_IT_RXNE);
+
 			bme_init_default_sr(&bme, &spi_interface_bme);
 			lsmset_sr (&ctx, &spi_interface_lsm);
+			int64_t cookie;
+			uint64_t time_s;
+			uint32_t time_us;
+			float lat;
+			float lon;
+			float alt;
 			float acc_g[3];
 			float gyro_dps[3];
 			float temperature_celsius_mag;
 			char headbuffer[1000];
-			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;temp;press;lux\n");
+			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;temp;press;lux;lat;lon;alt;cookie;time_s;time_us\n");
 			f_write(&SDFile, (uint8_t*) headbuffer, headcount, &CheckBytes);
 			f_sync(&SDFile);
 			uint16_t packet_num = 0;
@@ -289,6 +302,8 @@ int app_main(void)
 				struct bme280_data comp_data = bme_read_data(&bme);
 				float lux = photorezistor_get_lux(photorez_set);
 				lsmread(&ctx, &temperature_celsius_mag, &acc_g, &gyro_dps);
+				gps_get_coords(&cookie,  &lat, &lon, &alt);
+				gps_get_time(&cookie, &time_s, &time_us);
 				packet_da_type_1_t packet = {0};
 				packet.flag = 228;
 				packet.BME280_temperature = 10 * comp_data.temperature;
@@ -326,7 +341,7 @@ int app_main(void)
 
 				//nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 				//HAL_UART_Transmit(&huart1, (uint8_t*) &packet, sizeof(packet), 100);
-				printf("lux: %lf\n", lux);
+				printf("lat: %lf, lon: %lf, alt: %lf, time_s: %ld, time_us: %d\n", (float) lat, (float) lon, (float) alt, (uint32_t) time_s, (int) time_us);
 			}
 
 	return 0;
