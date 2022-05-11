@@ -15,6 +15,7 @@
 #include "nRF24L01_PL/nrf24_lower_api.h"
 #include "Photorezistor/photorezistor.h"
 #include "ATGM336H/nmea_gps.h"
+#include "LIS3MDL/DLIS3.h"
 
 
 
@@ -258,6 +259,11 @@ int app_main(void)
 				.resist = 5100,
 				.hadc = &hadc1
 			};
+			lis_spi_intf_sr spi_interface_lis = {
+					.sr_pin = 3,
+					.spi = &hspi2,
+					.sr = &shift_reg_
+			};
 
 	// ОСНОВНАЯ ЧАСТЬ, САМИ ФУНКЦИИ ИНИЦИАЛИЗАЦИИ ПРИБОРОВ
 			resSD = f_mount(&fileSystem, "", 1);
@@ -274,12 +280,14 @@ int app_main(void)
 
 			spi_interface_lsm.sr = &shift_reg_;
 			spi_interface_bme.sr = &shift_reg_;
+			spi_interface_lis.sr = &shift_reg_;
 
 			gps_init();
 			__HAL_UART_ENABLE_IT(&huart6, UART_IT_RXNE);
 
 			bme_init_default_sr(&bme, &spi_interface_bme);
-			lsmset_sr (&ctx, &spi_interface_lsm);
+			lsmset_sr(&ctx, &spi_interface_lsm);
+			lisset_sr(&ctx, &spi_interface_lis);
 			int64_t cookie;
 			uint64_t time_s;
 			uint32_t time_us;
@@ -288,9 +296,10 @@ int app_main(void)
 			float alt;
 			float acc_g[3];
 			float gyro_dps[3];
+			float mag_raw[3];
 			float temperature_celsius_mag;
 			char headbuffer[1000];
-			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;temp;press;lux;lat;lon;alt;cookie;time_s;time_us\n");
+			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;temp;press;lux;lat;lon;alt;cookie;time_s;time_us;magx;magy;magz\n");
 			f_write(&SDFile, (uint8_t*) headbuffer, headcount, &CheckBytes);
 			f_sync(&SDFile);
 			uint16_t packet_num = 0;
@@ -302,6 +311,7 @@ int app_main(void)
 				struct bme280_data comp_data = bme_read_data(&bme);
 				float lux = photorezistor_get_lux(photorez_set);
 				lsmread(&ctx, &temperature_celsius_mag, &acc_g, &gyro_dps);
+				lisread(&ctx, &temperature_celsius_mag, &mag_raw);
 				gps_get_coords(&cookie,  &lat, &lon, &alt);
 				gps_get_time(&cookie, &time_s, &time_us);
 				packet_da_type_1_t packet = {0};
@@ -319,7 +329,7 @@ int app_main(void)
 				packet.crc = Crc16((uint8_t*) &packet, sizeof(packet));
 
 				char snbuffer[1000];
-				int count = snprintf(snbuffer, 1000, "%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%lf;%lf;%lf\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2], comp_data.pressure, comp_data.temperature, lux);
+				int count = snprintf(snbuffer, 1000, "%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%lf;%lf;%lf\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2], mag_raw[0], mag_raw[1], mag_raw[1], comp_data.pressure, comp_data.temperature, lux);
 				f_write(&SDFile, (uint8_t*) snbuffer, count, &CheckBytes);
 				f_sync(&SDFile);
 
@@ -341,7 +351,8 @@ int app_main(void)
 
 				//nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 				//HAL_UART_Transmit(&huart1, (uint8_t*) &packet, sizeof(packet), 100);
-				printf("lat: %lf, lon: %lf, alt: %lf, time_s: %ld, time_us: %d\n", (float) lat, (float) lon, (float) alt, (uint32_t) time_s, (int) time_us);
+				//printf("lat: %lf, lon: %lf, alt: %lf, time_s: %ld, time_us: %d\n", (float) lat, (float) lon, (float) alt, (uint32_t) time_s, (int) time_us);
+				printf("magx: %10lf, magy: %10lf, magz: %10lf\n", mag_raw[0], mag_raw[1], mag_raw[2]);
 			}
 
 	return 0;
