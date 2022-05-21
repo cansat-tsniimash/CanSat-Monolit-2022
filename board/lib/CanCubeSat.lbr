@@ -6,7 +6,7 @@
 <setting alwaysvectorfont="no"/>
 <setting verticaltext="up"/>
 </settings>
-<grid distance="50" unitdist="mil" unit="mil" style="lines" multiple="1" display="yes" altdistance="5" altunitdist="mil" altunit="mil"/>
+<grid distance="0.5" unitdist="mm" unit="mm" style="lines" multiple="1" display="yes" altdistance="0.1" altunitdist="mm" altunit="mm"/>
 <layers>
 <layer number="1" name="Top" color="4" fill="1" visible="yes" active="yes"/>
 <layer number="2" name="Route2" color="16" fill="1" visible="no" active="yes"/>
@@ -3502,7 +3502,7 @@
 <hole x="0" y="0" drill="1"/>
 </package>
 <package name="DOSIM_SBM20-1">
-<pad name="P$1" x="-0.05" y="3" drill="1.016" shape="octagon"/>
+<pad name="P$1" x="-0.05" y="1.73" drill="1.016" shape="octagon"/>
 <pad name="P$2" x="0.05" y="-78.3" drill="1.016" shape="octagon"/>
 <wire x1="-0.75" y1="3.5" x2="0.75" y2="3.5" width="0.127" layer="21"/>
 <wire x1="0.75" y1="3.5" x2="0.75" y2="-5" width="0.127" layer="21"/>
@@ -3511,8 +3511,8 @@
 <wire x1="5.5" y1="-83" x2="-5.5" y2="-83" width="0.127" layer="21"/>
 <wire x1="-5.5" y1="-83" x2="-5.5" y2="-5" width="0.127" layer="21"/>
 <wire x1="-5.5" y1="-5" x2="-0.75" y2="-5" width="0.127" layer="21"/>
-<text x="-2.75" y="3" size="2.54" layer="21" align="center">+</text>
-<text x="-4.25" y="-78" size="2.54" layer="21" align="center">-</text>
+<text x="2.75" y="2" size="2.54" layer="21" align="center">+</text>
+<text x="4.25" y="-78" size="2.54" layer="21" align="center">-</text>
 <wire x1="0.75" y1="-5" x2="5.5" y2="-5" width="0.127" layer="21"/>
 <text x="10" y="-7" size="1" layer="21" rot="R90">&gt;NAME</text>
 </package>
