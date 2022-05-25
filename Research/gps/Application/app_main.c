@@ -625,15 +625,15 @@ int app_main()
 		i++;
 		gps_work();
 		int64_t cookie;
+		int fix_;
 		float lat_;
 		float lon_;
 		float alt_;
 		uint64_t time_s;
 		uint32_t time_us;
-		gps_get_coords(&cookie, &lat_, &lon_, &alt_);
+		gps_get_coords(&cookie, &lat_, &lon_, &alt_, &fix_);
 		gps_get_alt(&cookie, &alt_);
 		gps_get_time(&cookie,&time_s,&time_us);
-		printf("cookie = %d\n\r", (int) cookie);
 		printf("time_s = %d\n\r ", (int) time_s);
 		printf("time_us = %d\n\r ", (int) time_us);
 		printf("lat_ =%f\n\r ", (float) lat_);
