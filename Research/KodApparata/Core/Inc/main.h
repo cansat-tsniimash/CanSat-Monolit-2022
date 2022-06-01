@@ -57,6 +57,14 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define SECOND_LEVER_Pin GPIO_PIN_4
+#define SECOND_LEVER_GPIO_Port GPIOA
+#define COMPRESSOR_Pin GPIO_PIN_5
+#define COMPRESSOR_GPIO_Port GPIOA
+#define ENGINE_Pin GPIO_PIN_7
+#define ENGINE_GPIO_Port GPIOA
+#define BUZZER_Pin GPIO_PIN_8
+#define BUZZER_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
