@@ -24,6 +24,7 @@
 #define DELAY_FOR_WATERING 300000 // ИЗМЕРИТЬ ИМПЕРИЧЕСКИМ ПУТЁМ ТОЧНОЕ ВРЕМЯ!1!!1!!!
 #define SLEEPING_GROUND_HEIGHT_MEASURE_TIME 10000
 #define COOLDOWN_NRF_WRITE 500
+#define COOLDOWN_FSYNC_SD 1000
 
 
 extern ADC_HandleTypeDef hadc1;
@@ -36,6 +37,7 @@ extern UART_HandleTypeDef huart6;
 int ground_buffer_num = 0;
 uint32_t time_height_ground_measure = 0;
 uint32_t buffer_ground_height[2] = {0};
+
 //ТАЙМЕР ОТПРАВКИ ПАКЕТОВ РАДИО
 uint32_t time_fifo_send = 0;
 
@@ -294,6 +296,8 @@ int app_main(void)
 			FRESULT resSD; // результат выполнения функции
 			uint8_t path[11] = "SDcard.csv";
 			path[10] =  '\0';
+			char namebuffer[100];
+			uint32_t namecount = 0;
 
 			// Переменные для работы с бме и лсм
 			struct bme280_dev bme = {0};
@@ -401,7 +405,9 @@ int app_main(void)
 			if(resSD != FR_OK) {
 				printf("mount error, %d\n", resSD);
 			}
-			f_open(&SDFile, (char*)path, FA_WRITE | FA_CREATE_ALWAYS);
+			snprintf(namebuffer, 100, "AttemptFile%ld.csv", namecount);
+			namecount++;
+			f_open(&SDFile, namebuffer, FA_WRITE | FA_CREATE_NEW);
 
 
 			nrf24_mode_standby(&nrf24_lower_api_config);
@@ -454,13 +460,14 @@ int app_main(void)
 			float lon = 0;
 			float alt = 0;
 
-			//ПЕРЕМЕННЫЕ ДЛЯ АКСЕЛЕРОМЕТРА, ГИРОСКОПА И МАГНИТОМТРА СООТВЕТСТВЕННО
+			//ПЕРЕМЕННЫЕ ДЛЯ АКСЕЛЕРОМЕТРА, ГИРОСКОПА И МАГНИТОМЕТРА СООТВЕТСТВЕННО
 			float acc_g[3] = {0};
 			float gyro_dps[3] = {0};
 			float mag_raw[3] = {0};
 			float temperature_celsius_mag = 0;
 
 			//ЗАПИСЬ ЗАГОЛОВКОВ ТЕЛЕМЕТРИИ НА СД-КАРТУ
+			uint32_t time_from_last_FSYNC = 0;
 			char headbuffer[1000];
 			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;magx;magy;magz;press;tempBME;lux;lat;lon;alt;cookie;time_s;time_us;fix;tempDS\n");
 			f_write(&SDFile, (uint8_t*) headbuffer, headcount, &CheckBytes);
@@ -492,6 +499,7 @@ int app_main(void)
 				lisread(&ctx, &temperature_celsius_mag, &mag_raw);
 
 				//ТЕЛЕМЕТРИЯ С ГПС-КИ
+				gps_work();
 				gps_get_coords(&cookie,  &lat, &lon, &alt, &fix);
 				gps_get_time(&cookie, &time_s, &time_us);
 
@@ -593,9 +601,25 @@ int app_main(void)
 
 				// ЗАПИСЬ НА СД-КАРТУ
 				char snbuffer[1000];
-				int count = snprintf(snbuffer, 1000, "%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%lf;%lf;%lf;%lf;%lf;%lf;%lld;%lld;%ld;%d;%lf; %d\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2], mag_raw[0], mag_raw[1], mag_raw[2], comp_data.pressure, comp_data.temperature, lux, lat, lon, alt, cookie, time_s, time_us, fix, ds18_temp_celsius, status_apparate);
-				f_write(&SDFile, (uint8_t*) snbuffer, count, &CheckBytes);
-				f_sync(&SDFile);
+				int count = snprintf(snbuffer, 1000, "%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%lf;%lf;%lf;%lf;%lf;%lf;%lld;%lld;%ld;%d;%lf; %d\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2], mag_raw[0], mag_raw[1], mag_raw[2], comp_data.pressure, comp_data.temperature,  lux, lat, lon, alt, cookie, time_s, time_us, fix, ds18_temp_celsius, status_apparate);
+				FRESULT res = f_write(&SDFile, (uint8_t*) snbuffer, count, &CheckBytes);
+				if (res != FR_OK) {
+					f_close(&SDFile);
+					snprintf(namebuffer, 100, "AttemptFile%ld.csv", namecount);
+					namecount++;
+					FRESULT resOPENSD = f_open(&SDFile, namebuffer, FA_WRITE | FA_CREATE_NEW);
+						if ((resOPENSD != FR_OK) && (resOPENSD != FR_EXIST)) {
+							f_mount(NULL, "", 1);
+							FRESULT resMOUNTSD = f_mount(&fileSystem, "", 1);
+							if (resMOUNTSD != FR_OK) {
+								HAL_NVIC_SystemReset();
+							}
+						}
+				}
+				if (HAL_GetTick() - time_from_last_FSYNC > COOLDOWN_FSYNC_SD) {
+					time_from_last_FSYNC = HAL_GetTick();
+					f_sync(&SDFile);
+				}
 
 				//ОТПРАВКА ПАКЕТОВ ПО РАДИО
 				//dump_registers(&nrf24_lower_api_config);
@@ -620,7 +644,7 @@ int app_main(void)
 				//ЧИСТКА ФЛАГОВ РАДИО
 				nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 				//HAL_UART_Transmit(&huart1, (uint8_t*) &packet, sizeof(packet), 100);
-				//printf("lat: %lf, lon: %lf, alt: %lf, time_s: %ld, time_us: %d\n", (float) lat, (float) lon, (float) alt, (uint32_t) time_s, (int) time_us);
+				//printf("lat: %lf, lon: %lf, alt: %lf, time_s: %ld, time_us: %ld, fix: %d\n", (float) lat, (float) lon, (float) alt, (uint32_t) time_s, time_us, fix);
 				//printf("tempDS: %lf\n", ds18_temp_celsius);
 			}
 
