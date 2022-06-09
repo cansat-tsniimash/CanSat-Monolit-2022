@@ -17,11 +17,12 @@
 #include "ATGM336H/nmea_gps.h"
 #include "LIS3MDL/DLIS3.h"
 #include "1Wire_DS18B20/one_wire.h"
+#include "Dosimeter/dosimeter.h"
 
 #define HEIGHT_WATERING 300
 #define WATERING_DELAY 5000
 #define STARTING_DELAY 20000
-#define DELAY_FOR_WATERING 300000 // ИЗМЕРИТЬ ИМПЕРИЧЕСКИМ ПУТЁМ ТОЧНОЕ ВРЕМЯ!1!!1!!!
+#define DELAY_FOR_WATERING 20000 // ИЗМЕРИТЬ ИМПЕРИЧЕСКИМ ПУТЁМ ТОЧНОЕ ВРЕМЯ!1!!1!!!
 #define SLEEPING_GROUND_HEIGHT_MEASURE_TIME 10000
 #define COOLDOWN_NRF_WRITE 500
 #define COOLDOWN_FSYNC_SD 1000
@@ -38,8 +39,6 @@ int ground_buffer_num = 0;
 uint32_t time_height_ground_measure = 0;
 uint32_t buffer_ground_height[2] = {0};
 
-//ТАЙМЕР ОТПРАВКИ ПАКЕТОВ РАДИО
-uint32_t time_fifo_send = 0;
 
 unsigned short Crc16(unsigned char *buf, unsigned short len)
 {
@@ -181,7 +180,8 @@ static uint32_t count_height_BME(float pressure_BME, uint32_t pressure_outdoor) 
 }
 
 //ФУНКЦИИ ОТПРАВКИ ПАКЕТОВ ПО РАДИО С УЧЁТОМ НЕОБХОДИМОЙ ЗАДЕРЖКИ
-static void fifo_write_packet3(void * intf_ptr, const uint8_t * packet, uint8_t packet_size, bool use_ack) {
+static void fifo_write_packet_ds_and_state(void * intf_ptr, const uint8_t * packet, uint8_t packet_size, bool use_ack) {
+	static uint32_t time_fifo_send = 0;
 	if (HAL_GetTick() - time_fifo_send > COOLDOWN_NRF_WRITE) {
 		nrf24_fifo_write(intf_ptr, packet, packet_size, use_ack);
 		time_fifo_send = HAL_GetTick();
@@ -189,14 +189,16 @@ static void fifo_write_packet3(void * intf_ptr, const uint8_t * packet, uint8_t 
 
 }
 
-static void fifo_write_packet4(void * intf_ptr, const uint8_t * packet, uint8_t packet_size, bool use_ack) {
+static void fifo_write_packet_dosimeter(void * intf_ptr, const uint8_t * packet, uint8_t packet_size, bool use_ack) {
+	static uint32_t time_fifo_send = 0;
 	if (HAL_GetTick() - time_fifo_send > COOLDOWN_NRF_WRITE) {
 			nrf24_fifo_write(intf_ptr, packet, packet_size, use_ack);
 			time_fifo_send = HAL_GetTick();
 	}
 }
 
-static void fifo_write_packet5(void * intf_ptr, const uint8_t * packet, uint8_t packet_size, bool use_ack) {
+static void fifo_write_packet_GPS(void * intf_ptr, const uint8_t * packet, uint8_t packet_size, bool use_ack) {
+	static uint32_t time_fifo_send = 0;
 	if (HAL_GetTick() - time_fifo_send > COOLDOWN_NRF_WRITE) {
 			nrf24_fifo_write(intf_ptr, packet, packet_size, use_ack);
 			time_fifo_send = HAL_GetTick();
@@ -223,7 +225,7 @@ typedef struct
 
 	uint32_t time;
 	float lux;
-}packet_orient;
+}packet_orient_t;
 typedef struct
 {
 	uint8_t flag;
@@ -235,7 +237,7 @@ typedef struct
 
 	uint32_t BME280_pressure;
 	uint32_t time;
-}packet_BME280;
+}packet_BME280_t;
 typedef struct
 {
 	uint8_t flag;
@@ -246,7 +248,7 @@ typedef struct
 	uint16_t DS18B20_temperature;
 
 	uint32_t time;
-}packet_ds_and_state;
+}packet_ds_and_state_t;
 typedef struct
 {
 	uint8_t flag;
@@ -256,8 +258,9 @@ typedef struct
 
 	uint32_t time;
 	uint32_t tick_now;
+	uint32_t tick_min;
 	uint32_t tick_sum;
-}packet_dosimetr;
+}packet_dosimetr_t;
 typedef struct {
 	uint8_t flag;
 	uint8_t GPS_fix;
@@ -271,7 +274,7 @@ typedef struct {
 	uint32_t time;
 	uint32_t GPS_time_s;
 	uint32_t GPS_time_us;
-}packet_GPS;
+}packet_GPS_t;
 
 #pragma pack(pop)
 
@@ -288,6 +291,21 @@ typedef enum {
 
 int app_main(void)
 {
+
+
+
+			// TESTED
+
+			HAL_GPIO_WritePin(ENGINE_GPIO_Port, ENGINE_Pin, 1);
+			HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, 1);
+			HAL_Delay(7000);
+			HAL_GPIO_WritePin(COMPRESSOR_GPIO_Port, COMPRESSOR_Pin, 1);
+
+
+
+
+
+
 			status_apparate_t status_apparate = STATUS_PREROCKET;
             // Карта памяти (ПЕРЕМЕННЫЕ)
 			FATFS fileSystem; // переменная типа FATFS
@@ -466,19 +484,25 @@ int app_main(void)
 			float mag_raw[3] = {0};
 			float temperature_celsius_mag = 0;
 
+			//ПЕРЕМЕННЫЕ ДЛЯ ДОЗИМЕТРА
+			uint32_t tick_sum = 0;
+			uint32_t tick_now = 0;
+			uint32_t tick_min = 0;
+
+
 			//ЗАПИСЬ ЗАГОЛОВКОВ ТЕЛЕМЕТРИИ НА СД-КАРТУ
 			uint32_t time_from_last_FSYNC = 0;
 			char headbuffer[1000];
-			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;magx;magy;magz;press;tempBME;lux;lat;lon;alt;cookie;time_s;time_us;fix;tempDS\n");
+			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;magx;magy;magz;press;tempBME;lux;lat;lon;alt;cookie;time_s;time_us;fix;tempDS;state_apparat;tick_now;tick_min;tick_sum\n");
 			f_write(&SDFile, (uint8_t*) headbuffer, headcount, &CheckBytes);
 			f_sync(&SDFile);
 
 			//НУМЕРАЦИЯ ПАКЕТОВ РАДИО
-			uint16_t packet_num_1 = 0;
-			uint16_t packet_num_2 = 0;
-			uint16_t packet_num_3 = 0;
-			uint16_t packet_num_4 = 0;
-			uint16_t packet_num_5 = 0;
+			uint16_t packet_num_orient = 0;
+			uint16_t packet_num_BME280 = 0;
+			uint16_t packet_num_ds_state = 0;
+			uint16_t packet_num_dosimetr = 0;
+			uint16_t packet_num_GPS = 0;
 			while(1)
 			{
 				//ЗАПУСК АЦП
@@ -502,6 +526,11 @@ int app_main(void)
 				gps_work();
 				gps_get_coords(&cookie,  &lat, &lon, &alt, &fix);
 				gps_get_time(&cookie, &time_s, &time_us);
+
+				//ЧТЕНИЕ С ДОЗИМЕТРА
+				tick_sum = Dosimeter_Get_Sum();
+				tick_now = Dosimeter_Get_TPS();
+				tick_min = Dosimeter_Get_TPM();
 
 				//ЧТЕНИЕ И ПЕРЕВОД В ЧЕЛОВЕЧЕСКИЕ ВЕЛИЧИНЫ ПОКАЗАНИЙ С ДС18Б20
 				ds18b20_start_conversion(&onewire_intf_ds18b20);
@@ -527,15 +556,17 @@ int app_main(void)
 				if ((lux  > 0.9 * lux_outdoor) && (status_apparate == STATUS_IN_ROCKET)) {
 					status_apparate = STATUS_FREE_FALL;
 					watering_wait_time = HAL_GetTick();
+					HAL_GPIO_WritePin(ENGINE_GPIO_Port, ENGINE_Pin, 1); // ВКЛ двигателя центрифуги-распрыскивателя
 				}
 				if ((height_BME < HEIGHT_WATERING) && (status_apparate == STATUS_FREE_FALL) && (HAL_GetTick() - watering_wait_time > WATERING_DELAY)) {
 					status_apparate = STATUS_WATERING;
 					HAL_GPIO_WritePin(COMPRESSOR_GPIO_Port, COMPRESSOR_Pin, 1); // ВКЛ компрессора
-					HAL_GPIO_WritePin(ENGINE_GPIO_Port, ENGINE_Pin, 1); // ВКЛ двигателя центрифуги-распрыскивателя
 					time_of_watering = HAL_GetTick();
 				}
 				if ((HAL_GetTick() - time_of_watering > DELAY_FOR_WATERING) && (status_apparate == STATUS_WATERING)) {
 					status_apparate = STATUS_FREE_FALL;
+					HAL_GPIO_WritePin(COMPRESSOR_GPIO_Port, COMPRESSOR_Pin, 0); // ВЫКЛ компрессора
+					HAL_GPIO_WritePin(ENGINE_GPIO_Port, ENGINE_Pin, 0); // ВЫКЛ двигателя центрифуги-распрыскивателя
 				}
 				if ((check_for_landing(height_BME)) && (status_apparate == STATUS_FREE_FALL)) {
 					status_apparate = STATUS_GROUND;
@@ -550,58 +581,59 @@ int app_main(void)
 
 
 				//ОБЪЯВЛЕНИЕ ПАКЕТОВ
-				packet_orient packet1 = {0};
-				packet_BME280 packet2 = {0};
-				packet_ds_and_state packet3 = {0};
-				packet_dosimetr packet4 = {0};
-				packet_GPS packet5 = {0};
+				packet_orient_t packet_orient = {0};
+				packet_BME280_t packet_BME280 = {0};
+				packet_ds_and_state_t packet_ds_and_state = {0};
+				packet_dosimetr_t packet_dosimetr = {0};
+				packet_GPS_t packet_GPS = {0};
 
 				//ЗАПОЛНЕНИЕ ПАКЕТОВ ТЕЛЕМЕТРИЕЙ
-				packet1.flag = 228;
-				packet1.LSM6DSL_accelerometr_x = (int16_t)(1000 * acc_g[0]);
-				packet1.LSM6DSL_accelerometr_y = (int16_t)(1000 * acc_g[1]);
-				packet1.LSM6DSL_accelerometr_z = (int16_t)(1000 * acc_g[2]);
-				packet1.LSM6DSL_gyroscope_x = (int16_t)(100 * gyro_dps[0]);
-				packet1.LSM6DSL_gyroscope_y = (int16_t)(100 * gyro_dps[1]);
-				packet1.LSM6DSL_gyroscope_z = (int16_t)(100 * gyro_dps[2]);
-				packet1.LIS3MDL_magnitometr_x = (int16_t)(1000 * mag_raw[0]);
-				packet1.LIS3MDL_magnitometr_y = (int16_t)(1000 * mag_raw[1]);
-				packet1.LIS3MDL_magnitometr_z = (int16_t)(1000 * mag_raw[2]);
-				packet1.num = packet_num_1++;
-				packet1.time = HAL_GetTick();
-				packet1.crc = Crc16((uint8_t*) &packet1, sizeof(packet1));
-				packet2.flag = 117;
-				packet2.num = packet_num_2++;
-				packet2.BME280_temperature = (int16_t)(10 * comp_data.temperature);
-				packet2.BME280_pressure = (uint32_t)comp_data.pressure;
-				packet2.crc = Crc16((uint8_t*) &packet2, sizeof(packet2));
-				packet2.time = HAL_GetTick();
-				packet3.flag = 99;
-				packet3.num = packet_num_3++;
-				packet3.DS18B20_temperature = ds18_temp_celsius;
-				packet3.state_apparate = status_apparate;
-				packet3.crc = Crc16((uint8_t*) &packet3, sizeof(packet3));
-				packet3.time = HAL_GetTick();
-				packet4.flag = 66;
-				packet4.num = packet_num_4++;
-				//packet4.tick_now =
-				//packet4.tick_sum =
-				packet4.crc = Crc16((uint8_t*) &packet4, sizeof(packet4));
-				packet4.time = HAL_GetTick();
-				packet5.flag = 71;
-				packet5.num = packet_num_5++;
-				packet5.GPS_altitude = (int16_t)(10 * alt);
-				packet5.GPS_fix = (uint8_t)fix;
-				packet5.GPS_latitude = lat;
-				packet5.GPS_longtitude = lon;
-				packet5.GPS_time_s = (uint32_t)time_s;
-				packet5.GPS_time_us = time_us;
-				packet5.crc = Crc16((uint8_t*) &packet5, sizeof(packet5));
-				packet5.time = HAL_GetTick();
+				packet_orient.flag = 228;
+				packet_orient.LSM6DSL_accelerometr_x = (int16_t)(1000 * acc_g[0]);
+				packet_orient.LSM6DSL_accelerometr_y = (int16_t)(1000 * acc_g[1]);
+				packet_orient.LSM6DSL_accelerometr_z = (int16_t)(1000 * acc_g[2]);
+				packet_orient.LSM6DSL_gyroscope_x = (int16_t)(100 * gyro_dps[0]);
+				packet_orient.LSM6DSL_gyroscope_y = (int16_t)(100 * gyro_dps[1]);
+				packet_orient.LSM6DSL_gyroscope_z = (int16_t)(100 * gyro_dps[2]);
+				packet_orient.LIS3MDL_magnitometr_x = (int16_t)(1000 * mag_raw[0]);
+				packet_orient.LIS3MDL_magnitometr_y = (int16_t)(1000 * mag_raw[1]);
+				packet_orient.LIS3MDL_magnitometr_z = (int16_t)(1000 * mag_raw[2]);
+				packet_orient.num = packet_num_orient++;
+				packet_orient.time = HAL_GetTick();
+				packet_orient.crc = Crc16((uint8_t*) &packet_orient, sizeof(packet_orient));
+				packet_BME280.flag = 117;
+				packet_BME280.num = packet_num_BME280++;
+				packet_BME280.BME280_temperature = (int16_t)(10 * comp_data.temperature);
+				packet_BME280.BME280_pressure = (uint32_t)comp_data.pressure;
+				packet_BME280.crc = Crc16((uint8_t*) &packet_BME280, sizeof(packet_BME280));
+				packet_BME280.time = HAL_GetTick();
+				packet_ds_and_state.flag = 99;
+				packet_ds_and_state.num = packet_num_ds_state++;
+				packet_ds_and_state.DS18B20_temperature = ds18_temp_celsius;
+				packet_ds_and_state.state_apparate = status_apparate;
+				packet_ds_and_state.crc = Crc16((uint8_t*) &packet_ds_and_state, sizeof(packet_ds_and_state));
+				packet_ds_and_state.time = HAL_GetTick();
+				packet_dosimetr.flag = 66;
+				packet_dosimetr.num = packet_num_dosimetr++;
+				packet_dosimetr.tick_now = tick_now;
+				packet_dosimetr.tick_min = tick_min;
+				packet_dosimetr.tick_sum = tick_sum;
+ 				packet_dosimetr.crc = Crc16((uint8_t*) &packet_dosimetr, sizeof(packet_dosimetr));
+				packet_dosimetr.time = HAL_GetTick();
+				packet_GPS.flag = 71;
+				packet_GPS.num = packet_num_GPS++;
+				packet_GPS.GPS_altitude = (int16_t)(10 * alt);
+				packet_GPS.GPS_fix = (uint8_t)fix;
+				packet_GPS.GPS_latitude = lat;
+				packet_GPS.GPS_longtitude = lon;
+				packet_GPS.GPS_time_s = (uint32_t)time_s;
+				packet_GPS.GPS_time_us = time_us;
+				packet_GPS.crc = Crc16((uint8_t*) &packet_GPS, sizeof(packet_GPS));
+				packet_GPS.time = HAL_GetTick();
 
 				// ЗАПИСЬ НА СД-КАРТУ
 				char snbuffer[1000];
-				int count = snprintf(snbuffer, 1000, "%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%lf;%lf;%lf;%lf;%lf;%lf;%lld;%lld;%ld;%d;%lf; %d\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2], mag_raw[0], mag_raw[1], mag_raw[2], comp_data.pressure, comp_data.temperature,  lux, lat, lon, alt, cookie, time_s, time_us, fix, ds18_temp_celsius, status_apparate);
+				int count = snprintf(snbuffer, 1000, "%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%lf;%lf;%lf;%lf;%lf;%lf;%lld;%lld;%ld;%d;%lf;%d;%ld;%ld;%ld\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2], mag_raw[0], mag_raw[1], mag_raw[2], comp_data.pressure, comp_data.temperature,  lux, lat, lon, alt, cookie, time_s, time_us, fix, ds18_temp_celsius, status_apparate, tick_now, tick_min, tick_sum);
 				FRESULT res = f_write(&SDFile, (uint8_t*) snbuffer, count, &CheckBytes);
 				if (res != FR_OK) {
 					f_close(&SDFile);
@@ -625,11 +657,11 @@ int app_main(void)
 				//dump_registers(&nrf24_lower_api_config);
 				nrf24_fifo_status(&nrf24_lower_api_config, &Status_FIFO_RX, &Status_FIFO_TX);
 				if (Status_FIFO_TX != NRF24_FIFO_FULL) {
-					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet1, sizeof(packet1), false);
-					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet2, sizeof(packet2), false);
-					fifo_write_packet3(&nrf24_lower_api_config, (uint8_t*) &packet3, sizeof(packet3), false);
-					fifo_write_packet4(&nrf24_lower_api_config, (uint8_t*) &packet4, sizeof(packet4), false);
-					fifo_write_packet5(&nrf24_lower_api_config, (uint8_t*) &packet5, sizeof(packet5), false);
+					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet_orient, sizeof(packet_orient), false);
+					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet_BME280, sizeof(packet_BME280), false);
+					fifo_write_packet_ds_and_state(&nrf24_lower_api_config, (uint8_t*) &packet_ds_and_state, sizeof(packet_ds_and_state), false);
+					fifo_write_packet_dosimeter(&nrf24_lower_api_config, (uint8_t*) &packet_dosimetr, sizeof(packet_dosimetr), false);
+					fifo_write_packet_GPS(&nrf24_lower_api_config, (uint8_t*) &packet_GPS, sizeof(packet_GPS), false);
 					nrf24_mode_tx(&nrf24_lower_api_config);
 					HAL_Delay(5);
 					nrf24_mode_standby(&nrf24_lower_api_config);
@@ -645,7 +677,7 @@ int app_main(void)
 				nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 				//HAL_UART_Transmit(&huart1, (uint8_t*) &packet, sizeof(packet), 100);
 				//printf("lat: %lf, lon: %lf, alt: %lf, time_s: %ld, time_us: %ld, fix: %d\n", (float) lat, (float) lon, (float) alt, (uint32_t) time_s, time_us, fix);
-				//printf("tempDS: %lf\n", ds18_temp_celsius);
+				printf("tick_sum: %ld, tick_now: %ld, tick_min: %ld\n", tick_sum, tick_now, tick_min);
 			}
 
 	return 0;
