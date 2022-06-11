@@ -22,7 +22,7 @@
 #define HEIGHT_WATERING 300
 #define WATERING_DELAY 5000
 #define STARTING_DELAY 20000
-#define DELAY_FOR_WATERING 20000 // ИЗМЕРИТЬ ИМПЕРИЧЕСКИМ ПУТЁМ ТОЧНОЕ ВРЕМЯ!1!!1!!!
+#define DELAY_FOR_WATERING 20000
 #define SLEEPING_GROUND_HEIGHT_MEASURE_TIME 10000
 #define COOLDOWN_NRF_WRITE 500
 #define COOLDOWN_FSYNC_SD 1000
@@ -221,10 +221,10 @@ typedef struct
 	int16_t LIS3MDL_magnitometr_y;
 	int16_t LIS3MDL_magnitometr_z;
 	uint16_t num;
-	uint16_t crc;
 
 	uint32_t time;
 	float lux;
+	uint16_t crc;
 }packet_orient_t;
 typedef struct
 {
@@ -233,10 +233,11 @@ typedef struct
 	int16_t BME280_temperature;
 
 	uint16_t num;
-	uint16_t crc;
 
 	uint32_t BME280_pressure;
 	uint32_t time;
+
+	uint16_t crc;
 }packet_BME280_t;
 typedef struct
 {
@@ -244,22 +245,23 @@ typedef struct
 	uint8_t state_apparate;
 
 	uint16_t num;
-	uint16_t crc;
 	uint16_t DS18B20_temperature;
 
 	uint32_t time;
+	uint16_t crc;
 }packet_ds_and_state_t;
 typedef struct
 {
 	uint8_t flag;
 
 	uint16_t num;
-	uint16_t crc;
 
 	uint32_t time;
 	uint32_t tick_now;
 	uint32_t tick_min;
 	uint32_t tick_sum;
+
+	uint16_t crc;
 }packet_dosimetr_t;
 typedef struct {
 	uint8_t flag;
@@ -267,13 +269,14 @@ typedef struct {
 
 	int16_t GPS_altitude;
 	uint16_t num;
-	uint16_t crc;
 
 	float GPS_latitude;
 	float GPS_longtitude;
 	uint32_t time;
 	uint32_t GPS_time_s;
 	uint32_t GPS_time_us;
+
+	uint16_t crc;
 }packet_GPS_t;
 
 #pragma pack(pop)
@@ -296,11 +299,12 @@ int app_main(void)
 
 			// TESTED
 
+			/*
 			HAL_GPIO_WritePin(ENGINE_GPIO_Port, ENGINE_Pin, 1);
 			HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, 1);
 			HAL_Delay(7000);
 			HAL_GPIO_WritePin(COMPRESSOR_GPIO_Port, COMPRESSOR_Pin, 1);
-
+			*/
 
 
 
@@ -402,7 +406,7 @@ int app_main(void)
 					.sr = &shift_reg_
 			};
 			photorezistor_t photorez_set = {
-				.resist = 5100,
+				.resist = 2000,
 				.hadc = &hadc1
 			};
 			lis_spi_intf_sr spi_interface_lis = {
@@ -600,26 +604,26 @@ int app_main(void)
 				packet_orient.LIS3MDL_magnitometr_z = (int16_t)(1000 * mag_raw[2]);
 				packet_orient.num = packet_num_orient++;
 				packet_orient.time = HAL_GetTick();
-				packet_orient.crc = Crc16((uint8_t*) &packet_orient, sizeof(packet_orient));
+				packet_orient.crc = Crc16((uint8_t*) &packet_orient, sizeof(packet_orient) - 2);
 				packet_BME280.flag = 117;
 				packet_BME280.num = packet_num_BME280++;
 				packet_BME280.BME280_temperature = (int16_t)(10 * comp_data.temperature);
 				packet_BME280.BME280_pressure = (uint32_t)comp_data.pressure;
-				packet_BME280.crc = Crc16((uint8_t*) &packet_BME280, sizeof(packet_BME280));
 				packet_BME280.time = HAL_GetTick();
+				packet_BME280.crc = Crc16((uint8_t*) &packet_BME280, sizeof(packet_BME280));
 				packet_ds_and_state.flag = 99;
 				packet_ds_and_state.num = packet_num_ds_state++;
 				packet_ds_and_state.DS18B20_temperature = ds18_temp_celsius;
 				packet_ds_and_state.state_apparate = status_apparate;
-				packet_ds_and_state.crc = Crc16((uint8_t*) &packet_ds_and_state, sizeof(packet_ds_and_state));
 				packet_ds_and_state.time = HAL_GetTick();
+				packet_ds_and_state.crc = Crc16((uint8_t*) &packet_ds_and_state, sizeof(packet_ds_and_state) - 2);
 				packet_dosimetr.flag = 66;
 				packet_dosimetr.num = packet_num_dosimetr++;
 				packet_dosimetr.tick_now = tick_now;
 				packet_dosimetr.tick_min = tick_min;
 				packet_dosimetr.tick_sum = tick_sum;
- 				packet_dosimetr.crc = Crc16((uint8_t*) &packet_dosimetr, sizeof(packet_dosimetr));
 				packet_dosimetr.time = HAL_GetTick();
+ 				packet_dosimetr.crc = Crc16((uint8_t*) &packet_dosimetr, sizeof(packet_dosimetr) - 2);
 				packet_GPS.flag = 71;
 				packet_GPS.num = packet_num_GPS++;
 				packet_GPS.GPS_altitude = (int16_t)(10 * alt);
@@ -628,8 +632,8 @@ int app_main(void)
 				packet_GPS.GPS_longtitude = lon;
 				packet_GPS.GPS_time_s = (uint32_t)time_s;
 				packet_GPS.GPS_time_us = time_us;
-				packet_GPS.crc = Crc16((uint8_t*) &packet_GPS, sizeof(packet_GPS));
 				packet_GPS.time = HAL_GetTick();
+				packet_GPS.crc = Crc16((uint8_t*) &packet_GPS, sizeof(packet_GPS) - 2);
 
 				// ЗАПИСЬ НА СД-КАРТУ
 				char snbuffer[1000];
@@ -658,9 +662,21 @@ int app_main(void)
 				nrf24_fifo_status(&nrf24_lower_api_config, &Status_FIFO_RX, &Status_FIFO_TX);
 				if (Status_FIFO_TX != NRF24_FIFO_FULL) {
 					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet_orient, sizeof(packet_orient), false);
+					nrf24_mode_tx(&nrf24_lower_api_config);
+					HAL_Delay(5);
+					nrf24_mode_standby(&nrf24_lower_api_config);
 					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet_BME280, sizeof(packet_BME280), false);
+					nrf24_mode_tx(&nrf24_lower_api_config);
+					HAL_Delay(5);
+					nrf24_mode_standby(&nrf24_lower_api_config);
 					fifo_write_packet_ds_and_state(&nrf24_lower_api_config, (uint8_t*) &packet_ds_and_state, sizeof(packet_ds_and_state), false);
+					nrf24_mode_tx(&nrf24_lower_api_config);
+					HAL_Delay(5);
+					nrf24_mode_standby(&nrf24_lower_api_config);
 					fifo_write_packet_dosimeter(&nrf24_lower_api_config, (uint8_t*) &packet_dosimetr, sizeof(packet_dosimetr), false);
+					nrf24_mode_tx(&nrf24_lower_api_config);
+					HAL_Delay(5);
+					nrf24_mode_standby(&nrf24_lower_api_config);
 					fifo_write_packet_GPS(&nrf24_lower_api_config, (uint8_t*) &packet_GPS, sizeof(packet_GPS), false);
 					nrf24_mode_tx(&nrf24_lower_api_config);
 					HAL_Delay(5);
@@ -677,7 +693,10 @@ int app_main(void)
 				nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 				//HAL_UART_Transmit(&huart1, (uint8_t*) &packet, sizeof(packet), 100);
 				//printf("lat: %lf, lon: %lf, alt: %lf, time_s: %ld, time_us: %ld, fix: %d\n", (float) lat, (float) lon, (float) alt, (uint32_t) time_s, time_us, fix);
-				printf("tick_sum: %ld, tick_now: %ld, tick_min: %ld\n", tick_sum, tick_now, tick_min);
+				//printf("tick_sum: %ld, tick_now: %ld, tick_min: %ld\n", tick_sum, tick_now, tick_min);
+				//printf("pres:%lf, temp:%lf\n", comp_data.pressure, comp_data.temperature);
+				//printf("ax: %10lf ay: %10lf az: %10lf gx: %10lf gy: %10lf gz: %10lf\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2]);
+				//printf("magx: %10lf, magy: %10lf, magz: %10lf\n", mag_raw[0], mag_raw[1], mag_raw[2]);
 			}
 
 	return 0;
