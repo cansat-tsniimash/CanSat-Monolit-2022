@@ -19,9 +19,9 @@
 #include "1Wire_DS18B20/one_wire.h"
 #include "Dosimeter/dosimeter.h"
 
-#define HEIGHT_WATERING 300
+#define HEIGHT_WATERING 10 // 300 !!
 #define WATERING_DELAY 5000
-#define STARTING_DELAY 20000
+#define STARTING_DELAY 30000 // ЗАМЕНИТЬ!!!!!!!!11!1
 #define DELAY_FOR_WATERING 20000
 #define SLEEPING_GROUND_HEIGHT_MEASURE_TIME 10000
 #define COOLDOWN_NRF_WRITE 500
@@ -173,7 +173,7 @@ static int check_for_landing(uint32_t height_BME) {
 }
 
 //ФУНКЦИЯ ДЛЯ ПЕРЕСЧЁТА ДАВЛЕНИЯ В ВЫСОТУ С БМЕ
-static uint32_t count_height_BME(float pressure_BME, uint32_t pressure_outdoor) {
+static uint32_t count_height_BME(float pressure_BME, float pressure_outdoor) {
 	uint32_t height_for_BME = 0;
 	height_for_BME = 44330*(1 - pow(pressure_BME/pressure_outdoor, 1.0/5.255));
 	return height_for_BME;
@@ -203,6 +203,14 @@ static void fifo_write_packet_GPS(void * intf_ptr, const uint8_t * packet, uint8
 			nrf24_fifo_write(intf_ptr, packet, packet_size, use_ack);
 			time_fifo_send = HAL_GetTick();
 	}
+}
+
+
+//ФУНКЦИЯ ПЕРЕМЕН МОДОВ ОТПРАВКИ РАДИО ДЛЯ ОТПРАВКИ ВСЕХ ТИПОВ ПАКЕТОВ
+static void nrf_modes_plus_delay(void * intf_ptr) {
+	nrf24_mode_tx(intf_ptr);
+	HAL_Delay(5);
+	nrf24_mode_standby(intf_ptr);
 }
 
 #pragma pack(push,1)
@@ -282,11 +290,13 @@ typedef struct {
 #pragma pack(pop)
 
 typedef enum {
+	STATUS_CALCULATED_PRESS_LUX,
 	STATUS_PREROCKET,
 	STATUS_START_DELAY,
 	STATUS_IN_ROCKET,
 	STATUS_FREE_FALL,
 	STATUS_WATERING,
+	STATUS_FREE_FALL_AFTER_WATERING,
 	STATUS_GROUND
 } status_apparate_t;
 
@@ -310,7 +320,7 @@ int app_main(void)
 
 
 
-			status_apparate_t status_apparate = STATUS_PREROCKET;
+			status_apparate_t status_apparate = STATUS_CALCULATED_PRESS_LUX;
             // Карта памяти (ПЕРЕМЕННЫЕ)
 			FATFS fileSystem; // переменная типа FATFS
 			FIL SDFile; // хендлер файла
@@ -323,7 +333,8 @@ int app_main(void)
 
 			// Переменные для работы с бме и лсм
 			struct bme280_dev bme = {0};
-			stmdev_ctx_t ctx = {0};
+			stmdev_ctx_t ctx_lsm = {0};
+			stmdev_ctx_t ctx_lis = {0};
 
 
 // НАСТРОЙКА РАДИО (СТРАКТЫ)
@@ -453,8 +464,8 @@ int app_main(void)
 			bme_init_default_sr(&bme, &spi_interface_bme);
 
 			//ИНИЦИАЛИЗАЦИЯ ЛСМ И ЛИСА
-			lsmset_sr(&ctx, &spi_interface_lsm);
-			lisset_sr(&ctx, &spi_interface_lis);
+			lsmset_sr(&ctx_lsm, &spi_interface_lsm);
+			lisset_sr(&ctx_lis, &spi_interface_lis);
 
 			// ВВОД ПЕРЕМЕННЫХ И ИНИЦИАЛИЗАЦИЯ ДС18Б20
 			int8_t alarm_th = 50;
@@ -467,7 +478,7 @@ int app_main(void)
 			uint32_t watering_wait_time = 0;
 			uint32_t time_of_watering = 0;
 			uint32_t height_BME = 0;
-			uint32_t pressure_outdoor = 0;
+			float pressure_outdoor = 0;
 
 			//ПЕРЕМЕННЫЕ ДЛЯ ФОТОРЕЗИСТОРА
 			float lux = 0;
@@ -497,7 +508,7 @@ int app_main(void)
 			//ЗАПИСЬ ЗАГОЛОВКОВ ТЕЛЕМЕТРИИ НА СД-КАРТУ
 			uint32_t time_from_last_FSYNC = 0;
 			char headbuffer[1000];
-			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;magx;magy;magz;press;tempBME;lux;lat;lon;alt;cookie;time_s;time_us;fix;tempDS;state_apparat;tick_now;tick_min;tick_sum\n");
+			int headcount = snprintf(headbuffer, 1000, "ax;ay;az;gx;gy;gz;magx;magy;magz;press;tempBME;lux;lat;lon;alt;cookie;time_s;time_us;fix;tempDS;state_apparat;tick_now;tick_min;tick_sum;pressure_out;lux_outdoor;height_BME\n");
 			f_write(&SDFile, (uint8_t*) headbuffer, headcount, &CheckBytes);
 			f_sync(&SDFile);
 
@@ -507,9 +518,13 @@ int app_main(void)
 			uint16_t packet_num_ds_state = 0;
 			uint16_t packet_num_dosimetr = 0;
 			uint16_t packet_num_GPS = 0;
+
+
+
 			while(1)
 			{
 				//ЗАПУСК АЦП
+				//uint32_t start = HAL_GetTick(); (TESTED)
 				HAL_ADC_Start(&hadc1);
 
 				//ОБЪЯВЛЕНИЕ ПЕРЕМЕННЫХ ДЛЯ ЗАПИСИ СОСТОЯНИЯ ФИФО-БУФФЕРА
@@ -523,8 +538,8 @@ int app_main(void)
 				lux = photorezistor_get_lux(photorez_set);
 
 				//ЧТЕНИЕ С ЛИС И ЛСМ
-				lsmread(&ctx, &temperature_celsius_mag, &acc_g, &gyro_dps);
-				lisread(&ctx, &temperature_celsius_mag, &mag_raw);
+				lsmread(&ctx_lsm, &temperature_celsius_mag, &acc_g, &gyro_dps);
+				lisread(&ctx_lis, &temperature_celsius_mag, &mag_raw);
 
 				//ТЕЛЕМЕТРИЯ С ГПС-КИ
 				gps_work();
@@ -542,16 +557,20 @@ int app_main(void)
 				float ds18_temp_celsius = ds18_raw_temperature / 16.0;
 
 				// СОСТОЯНИЯ
-				if ((HAL_GPIO_ReadPin(SECOND_LEVER_GPIO_Port, SECOND_LEVER_Pin) == 1) && (status_apparate = STATUS_PREROCKET)) { // Условие на вкл 2ого тумблера (а4)
+				if (status_apparate == STATUS_CALCULATED_PRESS_LUX) {
+					//ЗАМЕР СОСТОЯНИЯ ОКРУЖАЮЩЕЙ СРЕДЫ
+					status_apparate = STATUS_PREROCKET;
+					int count = 10;
+					for (int i = 0; i < count; i++) {
+						lux_outdoor += photorezistor_get_lux(photorez_set);
+						pressure_outdoor += (uint32_t)comp_data.pressure;
+					}
+					lux_outdoor /= count;
+					pressure_outdoor /= count;
+				}
+				if ((HAL_GPIO_ReadPin(SECOND_LEVER_GPIO_Port, SECOND_LEVER_Pin) != 0) && (status_apparate == STATUS_PREROCKET)) { // Условие на вкл 2ого тумблера (а4)
 						status_apparate = STATUS_START_DELAY;
 						start_time = HAL_GetTick();
-						int count = 10;
-						for (int i = 0; i < count; i++) {
-							lux_outdoor += photorezistor_get_lux(photorez_set);
-							pressure_outdoor += (uint32_t)comp_data.pressure;
-						}
-						lux_outdoor /= count;
-						pressure_outdoor /= count;
 				}
 				height_BME = count_height_BME(comp_data.pressure, pressure_outdoor);
 				if ((HAL_GetTick() - start_time > STARTING_DELAY) && (status_apparate == STATUS_START_DELAY)) {
@@ -568,11 +587,11 @@ int app_main(void)
 					time_of_watering = HAL_GetTick();
 				}
 				if ((HAL_GetTick() - time_of_watering > DELAY_FOR_WATERING) && (status_apparate == STATUS_WATERING)) {
-					status_apparate = STATUS_FREE_FALL;
+					status_apparate = STATUS_FREE_FALL_AFTER_WATERING;
 					HAL_GPIO_WritePin(COMPRESSOR_GPIO_Port, COMPRESSOR_Pin, 0); // ВЫКЛ компрессора
 					HAL_GPIO_WritePin(ENGINE_GPIO_Port, ENGINE_Pin, 0); // ВЫКЛ двигателя центрифуги-распрыскивателя
 				}
-				if ((check_for_landing(height_BME)) && (status_apparate == STATUS_FREE_FALL)) {
+				if ((check_for_landing(height_BME)) && (status_apparate == STATUS_FREE_FALL_AFTER_WATERING)) {
 					status_apparate = STATUS_GROUND;
 					HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, 1); //ВКЛ пищалки
 				}
@@ -637,7 +656,7 @@ int app_main(void)
 
 				// ЗАПИСЬ НА СД-КАРТУ
 				char snbuffer[1000];
-				int count = snprintf(snbuffer, 1000, "%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%lf;%lf;%lf;%lf;%lf;%lf;%lld;%lld;%ld;%d;%lf;%d;%ld;%ld;%ld\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2], mag_raw[0], mag_raw[1], mag_raw[2], comp_data.pressure, comp_data.temperature,  lux, lat, lon, alt, cookie, time_s, time_us, fix, ds18_temp_celsius, status_apparate, tick_now, tick_min, tick_sum);
+				int count = snprintf(snbuffer, 1000, "%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%10lf;%lf;%lf;%lf;%lf;%lf;%lf;%lld;%lld;%ld;%d;%lf;%d;%ld;%ld;%ld;%lf;%lf;%ld\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2], mag_raw[0], mag_raw[1], mag_raw[2], comp_data.pressure, comp_data.temperature,  lux, lat, lon, alt, cookie, time_s, time_us, fix, ds18_temp_celsius, status_apparate, tick_now, tick_min, tick_sum, pressure_outdoor, lux_outdoor, height_BME);
 				FRESULT res = f_write(&SDFile, (uint8_t*) snbuffer, count, &CheckBytes);
 				if (res != FR_OK) {
 					f_close(&SDFile);
@@ -656,32 +675,20 @@ int app_main(void)
 					time_from_last_FSYNC = HAL_GetTick();
 					f_sync(&SDFile);
 				}
-
 				//ОТПРАВКА ПАКЕТОВ ПО РАДИО
 				//dump_registers(&nrf24_lower_api_config);
 				nrf24_fifo_status(&nrf24_lower_api_config, &Status_FIFO_RX, &Status_FIFO_TX);
 				if (Status_FIFO_TX != NRF24_FIFO_FULL) {
 					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet_orient, sizeof(packet_orient), false);
-					nrf24_mode_tx(&nrf24_lower_api_config);
-					HAL_Delay(5);
-					nrf24_mode_standby(&nrf24_lower_api_config);
+					nrf_modes_plus_delay(&nrf24_lower_api_config);
 					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet_BME280, sizeof(packet_BME280), false);
-					nrf24_mode_tx(&nrf24_lower_api_config);
-					HAL_Delay(5);
-					nrf24_mode_standby(&nrf24_lower_api_config);
+					nrf_modes_plus_delay(&nrf24_lower_api_config);
 					fifo_write_packet_ds_and_state(&nrf24_lower_api_config, (uint8_t*) &packet_ds_and_state, sizeof(packet_ds_and_state), false);
-					nrf24_mode_tx(&nrf24_lower_api_config);
-					HAL_Delay(5);
-					nrf24_mode_standby(&nrf24_lower_api_config);
+					nrf_modes_plus_delay(&nrf24_lower_api_config);
 					fifo_write_packet_dosimeter(&nrf24_lower_api_config, (uint8_t*) &packet_dosimetr, sizeof(packet_dosimetr), false);
-					nrf24_mode_tx(&nrf24_lower_api_config);
-					HAL_Delay(5);
-					nrf24_mode_standby(&nrf24_lower_api_config);
+					nrf_modes_plus_delay(&nrf24_lower_api_config);
 					fifo_write_packet_GPS(&nrf24_lower_api_config, (uint8_t*) &packet_GPS, sizeof(packet_GPS), false);
-					nrf24_mode_tx(&nrf24_lower_api_config);
-					HAL_Delay(5);
-					nrf24_mode_standby(&nrf24_lower_api_config);
-
+					nrf_modes_plus_delay(&nrf24_lower_api_config);
 				}
 				else
 				{
@@ -697,6 +704,11 @@ int app_main(void)
 				//printf("pres:%lf, temp:%lf\n", comp_data.pressure, comp_data.temperature);
 				//printf("ax: %10lf ay: %10lf az: %10lf gx: %10lf gy: %10lf gz: %10lf\n", acc_g[0], acc_g[1], acc_g[2], gyro_dps[0], gyro_dps[1], gyro_dps[2]);
 				//printf("magx: %10lf, magy: %10lf, magz: %10lf\n", mag_raw[0], mag_raw[1], mag_raw[2]);
+				//printf("lux: %f\n", lux);
+				//printf("sost: %d\n", status_apparate);
+				//TESTED:      uint32_t stop = HAL_GetTick();
+				//printf("clock: %ld\n", start-stop);
+
 			}
 
 	return 0;
