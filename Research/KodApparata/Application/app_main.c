@@ -25,6 +25,7 @@
 #define DELAY_FOR_WATERING 20000
 #define SLEEPING_GROUND_HEIGHT_MEASURE_TIME 10000
 #define COOLDOWN_NRF_WRITE 500
+#define COOLDOWN_NRF_SPEED_WRITE 0 // TESTED
 #define COOLDOWN_FSYNC_SD 1000
 
 
@@ -180,6 +181,20 @@ static uint32_t count_height_BME(float pressure_BME, float pressure_outdoor) {
 }
 
 //ФУНКЦИИ ОТПРАВКИ ПАКЕТОВ ПО РАДИО С УЧЁТОМ НЕОБХОДИМОЙ ЗАДЕРЖКИ
+static void fifo_write_packet_orient(void * intf_ptr, const uint8_t * packet, uint8_t packet_size, bool use_ack) {
+	static uint32_t time_fifo_send = 0;
+	if (HAL_GetTick() - time_fifo_send > COOLDOWN_NRF_SPEED_WRITE) {
+		nrf24_fifo_write(intf_ptr, packet, packet_size, use_ack);
+		time_fifo_send = HAL_GetTick();
+	}
+}
+static void fifo_write_packet_BME280(void * intf_ptr, const uint8_t * packet, uint8_t packet_size, bool use_ack) {
+	static uint32_t time_fifo_send = 0;
+	if (HAL_GetTick() - time_fifo_send > COOLDOWN_NRF_SPEED_WRITE) {
+		nrf24_fifo_write(intf_ptr, packet, packet_size, use_ack);
+		time_fifo_send = HAL_GetTick();
+	}
+}
 static void fifo_write_packet_ds_and_state(void * intf_ptr, const uint8_t * packet, uint8_t packet_size, bool use_ack) {
 	static uint32_t time_fifo_send = 0;
 	if (HAL_GetTick() - time_fifo_send > COOLDOWN_NRF_WRITE) {
@@ -679,9 +694,9 @@ int app_main(void)
 				//dump_registers(&nrf24_lower_api_config);
 				nrf24_fifo_status(&nrf24_lower_api_config, &Status_FIFO_RX, &Status_FIFO_TX);
 				if (Status_FIFO_TX != NRF24_FIFO_FULL) {
-					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet_orient, sizeof(packet_orient), false);
+					fifo_write_packet_orient(&nrf24_lower_api_config, (uint8_t*) &packet_orient, sizeof(packet_orient), false);
 					nrf_modes_plus_delay(&nrf24_lower_api_config);
-					nrf24_fifo_write(&nrf24_lower_api_config, (uint8_t*) &packet_BME280, sizeof(packet_BME280), false);
+					fifo_write_packet_BME280(&nrf24_lower_api_config, (uint8_t*) &packet_BME280, sizeof(packet_BME280), false);
 					nrf_modes_plus_delay(&nrf24_lower_api_config);
 					fifo_write_packet_ds_and_state(&nrf24_lower_api_config, (uint8_t*) &packet_ds_and_state, sizeof(packet_ds_and_state), false);
 					nrf_modes_plus_delay(&nrf24_lower_api_config);
