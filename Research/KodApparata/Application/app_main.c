@@ -19,9 +19,9 @@
 #include "1Wire_DS18B20/one_wire.h"
 #include "Dosimeter/dosimeter.h"
 
-#define HEIGHT_WATERING 10 // 300 !!
+#define HEIGHT_WATERING 300
 #define WATERING_DELAY 5000
-#define STARTING_DELAY 30000 // ЗАМЕНИТЬ!!!!!!!!11!1
+#define STARTING_DELAY 20000 // ЗАМЕНИТЬ!!!!!!!!11!1
 #define DELAY_FOR_WATERING 20000
 #define SLEEPING_GROUND_HEIGHT_MEASURE_TIME 10000
 #define COOLDOWN_NRF_WRITE 500
@@ -209,7 +209,7 @@ static void fifo_write_packet_GPS(void * intf_ptr, const uint8_t * packet, uint8
 //ФУНКЦИЯ ПЕРЕМЕН МОДОВ ОТПРАВКИ РАДИО ДЛЯ ОТПРАВКИ ВСЕХ ТИПОВ ПАКЕТОВ
 static void nrf_modes_plus_delay(void * intf_ptr) {
 	nrf24_mode_tx(intf_ptr);
-	HAL_Delay(5);
+	HAL_Delay(3);
 	nrf24_mode_standby(intf_ptr);
 }
 
